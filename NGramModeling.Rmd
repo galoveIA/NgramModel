@@ -1,0 +1,138 @@
+---
+title: "NGramModeling"
+author: "Gabe Love"
+date: "12/6/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Packages
+```{r warning=F}
+#install.packages('ngram')
+library(ngram)
+library(tidyverse)
+```
+
+## Setup
+Randomness will be used for prediction
+```{r}
+set.seed(1)
+```
+
+### Importing Data
+```{r warning=F}
+text <- readLines("tv_text.txt")
+substring(text[2],0, 1000)
+```
+
+### Data Cleaning
+```{r}
+tvProc <- preprocess(concatenate(text), case='lower', remove.punct = T) #Does a signifigant amount of text cleaning
+substring(tvProc,0, 1000)
+
+#Replaces the following
+#tvProc <- gsub("[^a-zA-Z[:space:]]", "", textProc) - Removes all non-alphabet or space characters
+#tvProc <- gsub("\\s+"," ",textProc) - Removes added whitespace
+```
+
+### Data Summary
+```{r out.height="40%"}
+string.summary(tvProc)
+```
+
+### Dividing Text
+The model defauls to n=2, but can can be specified for wider n-grams
+```{r}
+bg <- ngram(tvProc) # defaults to bi-grams
+#print(bg, output="truncated") - Shows bigrams, unordered and not particularly meaningful
+```
+
+### Showing Bi-grams by frequency
+```{r}
+head(get.phrasetable(bg))
+```
+
+### Making a data frame of the Bi-Grams
+```{r results = 'hide', echo = T}
+df <- get.ngrams(bg)
+head(df)
+```
+
+## True Bayes N-gram predicting
+If we were trying to find the most likely word following "and", we find the number of bi-grams that start with and and then of those find the most common word
+```{r}
+set <- df[grepl("and ", df)]
+head(set)
+
+set <- sub(".* ", "", set)
+
+summ <- data.frame(Words = set) %>% group_by(Words) %>% summarise(Words = Words, Freq = sum(n())) %>% arrange(-Freq) %>% unique #Could stop here
+head(summ)
+
+prob <- summ$Freq[1]/sum(summ$Freq)
+print(prob)
+```
+
+
+```{r include=F}
+#Function to help predict n-grams
+predict <- function(model, word, n=1){
+  set <- df[grepl(paste0(word, " "), df)]
+  head(set)
+  
+  set <- sub(".* ", "", set)
+  
+  summ <- data.frame(Words = set) %>% group_by(Words) %>% summarise(Words = Words, Freq = sum(n())) %>% arrange(-Freq) %>% unique
+  
+  print(paste(word, summ$Words[n]))
+}
+
+predict(bg, "and", 10)
+
+#get.nextwords() - not yet implemented
+```
+
+
+## Tri-grams
+```{r}
+tg <- ngram(tvProc, n=3)
+
+head(get.phrasetable(tg))
+
+#get.ngrams(tg)
+```
+
+## More Formal Dataset
+```{r}
+wiki <- readLines("wiki_text.txt")
+
+wikiProc <- preprocess(concatenate(wiki), case='lower', remove.punct = T)
+#substring(wikiProc[2],0, 1000)
+
+#string.summary(wikiProc)
+
+wikiTG <- ngram(wikiProc, n=3)
+par(mfrow = c(1,2))
+head(get.phrasetable(wikiTG))
+head(get.phrasetable(tg))
+```
+
+## Generating "Sentences"
+### Tv-Show Bi-grams
+```{r}
+babble(bg, genlen = 11, seed=1)
+```
+
+### TV-Show Tri-grams
+```{r}
+babble(tg, genlen= 11, seed=1)
+```
+
+### Wikipedia Tri-grams
+```{r}
+#babble(wikiTG, genlen= 11, seed=1)
+babble(wikiTG, genlen= 20, seed=1)
+```
